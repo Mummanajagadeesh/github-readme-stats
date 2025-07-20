@@ -229,13 +229,19 @@ const fallbackColor = (color, fallbackColor) => {
  * @param {AxiosRequestConfigHeaders} headers Request headers.
  * @returns {Promise<any>} Request response.
  */
-const request = (data, headers) => {
-  return axios({
-    url: "https://api.github.com/graphql",
-    method: "post",
-    headers,
-    data,
+const request = async (graphqlQuery, headers = {}) => {
+  const token =
+    headers.Authorization ||
+    `token ${process.env.GH_TOKEN || process.env.PRIVATE_GH_TOKEN}`;
+
+  const res = await axios.post("https://api.github.com/graphql", graphqlQuery, {
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: token,
+    },
   });
+
+  return res;
 };
 
 /**
