@@ -67,9 +67,10 @@ const urlExample = "/api/pin?username=USERNAME&amp;repo=REPO_NAME";
  *
  * @param {string} username GitHub username.
  * @param {string} reponame GitHub repository name.
+ * @param {string} [token] Optional GitHub token (used for private repo access).
  * @returns {Promise<RepositoryData>} Repository data.
  */
-const fetchRepo = async (username, reponame) => {
+const fetchRepo = async (username, reponame, token) => {
   if (!username && !reponame) {
     throw new MissingParamError(["username", "repo"], urlExample);
   }
@@ -80,7 +81,14 @@ const fetchRepo = async (username, reponame) => {
     throw new MissingParamError(["repo"], urlExample);
   }
 
-  let res = await retryer(fetcher, { login: username, repo: reponame });
+  const finalToken =
+    token || process.env.GH_TOKEN || process.env.PRIVATE_GH_TOKEN;
+
+  if (!finalToken) {
+    throw new Error("GitHub token is required to fetch private repo metadata.");
+  }
+
+  let res = await retryer(fetcher, { login: username, repo: reponame }, finalToken);
 
   const data = res.data.data;
 
@@ -92,7 +100,7 @@ const fetchRepo = async (username, reponame) => {
   const isOrg = data.user === null && data.organization;
 
   if (isUser) {
-    if (!data.user.repository || data.user.repository.isPrivate) {
+    if (!data.user.repository) {
       throw new Error("User Repository Not found");
     }
     return {
@@ -102,10 +110,7 @@ const fetchRepo = async (username, reponame) => {
   }
 
   if (isOrg) {
-    if (
-      !data.organization.repository ||
-      data.organization.repository.isPrivate
-    ) {
+    if (!data.organization.repository) {
       throw new Error("Organization Repository Not found");
     }
     return {
