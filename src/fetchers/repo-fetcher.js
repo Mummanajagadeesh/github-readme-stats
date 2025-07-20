@@ -52,11 +52,21 @@ const fetcher = (variables, token) => {
     },
     {
       Authorization: `token ${token}`,
-    },
+    }
   );
 };
 
 const urlExample = "/api/pin?username=USERNAME&amp;repo=REPO_NAME";
+
+/**
+ * Timeout helper to fail early if GitHub API stalls.
+ * @param {number} ms Timeout in milliseconds.
+ * @returns {Promise<never>}
+ */
+const timeout = (ms) =>
+  new Promise((_, reject) =>
+    setTimeout(() => reject(new Error("GitHub API timeout")), ms)
+  );
 
 /**
  * @typedef {import("./types").RepositoryData} RepositoryData Repository data.
@@ -82,18 +92,27 @@ const fetchRepo = async (username, reponame, token) => {
   }
 
   const finalToken =
-    token || process.env.GH_TOKEN || process.env.PRIVATE_GH_TOKEN;
+    token || process.env.PRIVATE_GH_TOKEN || process.env.GH_TOKEN;
 
   if (!finalToken) {
     throw new Error("GitHub token is required to fetch private repo metadata.");
   }
 
-  let res = await retryer(fetcher, { login: username, repo: reponame }, finalToken);
+  let res;
+  try {
+    res = await Promise.race([
+      retryer(fetcher, { login: username, repo: reponame }, finalToken),
+      timeout(8000), // 8 second timeout
+    ]);
+  } catch (err) {
+    console.error("[fetchRepo ERROR]", err);
+    throw new Error("Failed to fetch repo (timeout or GitHub API error).");
+  }
 
-  const data = res.data.data;
+  const data = res?.data?.data;
 
-  if (!data.user && !data.organization) {
-    throw new Error("Not found");
+  if (!data || (!data.user && !data.organization)) {
+    throw new Error("Repository not found or inaccessible.");
   }
 
   const isUser = data.organization === null && data.user;
