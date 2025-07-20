@@ -29,6 +29,7 @@ export default async (req, res) => {
 
   res.setHeader("Content-Type", "image/svg+xml");
 
+  // Blacklist check
   if (blacklist.includes(username)) {
     return res.send(
       renderError("Something went wrong", "This username is blacklisted", {
@@ -41,6 +42,7 @@ export default async (req, res) => {
     );
   }
 
+  // Locale validation
   if (locale && !isLocaleAvailable(locale)) {
     return res.send(
       renderError("Something went wrong", "Language not found", {
@@ -54,13 +56,16 @@ export default async (req, res) => {
   }
 
   try {
-    const repoData = await fetchRepo(username, repo);
+    // 🔒 Always pass token into fetchRepo for private access
+    const token = process.env.GH_TOKEN || process.env.PRIVATE_GH_TOKEN;
+    const repoData = await fetchRepo(username, repo, token);
 
     let cacheSeconds = clampValue(
       parseInt(cache_seconds || CONSTANTS.PIN_CARD_CACHE_SECONDS, 10),
       CONSTANTS.ONE_DAY,
       CONSTANTS.TEN_DAY,
     );
+
     cacheSeconds = process.env.CACHE_SECONDS
       ? parseInt(process.env.CACHE_SECONDS, 10) || cacheSeconds
       : cacheSeconds;
@@ -91,7 +96,7 @@ export default async (req, res) => {
       `max-age=${CONSTANTS.ERROR_CACHE_SECONDS / 2}, s-maxage=${
         CONSTANTS.ERROR_CACHE_SECONDS
       }, stale-while-revalidate=${CONSTANTS.ONE_DAY}`,
-    ); // Use lower cache period for errors.
+    );
     return res.send(
       renderError(err.message, err.secondaryMessage, {
         title_color,
