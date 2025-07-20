@@ -108,3 +108,9 @@ export default async (req, res) => {
     );
   }
 };
+
+
+
+console.log("[DEBUG] GH_TOKEN set:", !!process.env.GH_TOKEN);
+console.log("[DEBUG] PRIVATE_GH_TOKEN set:", !!process.env.PRIVATE_GH_TOKEN);
+
